@@ -1,3 +1,36 @@
+Sat, 28 Nov 2009 01:07:42 -0700  Sean Reifschneider  <jafo@tummy.com>
+
+   * Version 1.45
+
+   * Per-connection max server key length.  Patch by Nicolas Delaby
+
+   * Patches to make memcached more garbage-collectable.  Removes
+     "debugfunc" argument from _Host objects and changed to "debug"
+     boolean.  Patches by John McFarlane and Aryeh Katz.
+
+   * Switching to a cmemcache compatible hash function.  Implemented by
+     André Cru and Ludvig Ericson.  To switch back to the old style, use:
+
+        memcached.useOldServerHashFunction()
+
+   * Rejecting keys that have spaces in them.  Patch by Etienne Posthumus.
+
+   * Fixing exception raising syntax.  Patch by Samuel Stauffer.
+
+   * Optimizations in read code.  Patch by Samuel Stauffer.
+
+   * Changing classes to be newstyle.  Patch by Samuel Stauffer.
+
+   * Changed "has_key" to "in".  Patch by Samuel Stauffer.
+
+   * incr/decr were raising ValueError if the key did not exist, the
+     docstring said it returned none.  Patch by Chihiro Sakatoku.
+
+   * Adding cas method, submitted by Ben Gutierrez.
+
+   * Fix in the docstring for how to use the "set" method.  Found and fixed
+     by William McVey
+
 Thu, 02 Apr 2009 13:37:49 -0600  Sean Reifschneider  <jafo@tummy.com>
 
    * Version 1.44
