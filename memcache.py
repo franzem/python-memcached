@@ -60,6 +60,7 @@ serverHashFunction = cmemcache_hash
 
 def useOldServerHashFunction():
     """Use the old python-memcache server hash function."""
+    global serverHashFunction
     serverHashFunction = crc32
 
 try:
@@ -79,7 +80,7 @@ except ImportError:
 
 #  Original author: Evan Martin of Danga Interactive
 __author__    = "Sean Reifschneider <jafo-memcached@tummy.com>"
-__version__ = "1.46"
+__version__ = "1.47"
 __copyright__ = "Copyright (C) 2003 Danga Interactive"
 #  http://en.wikipedia.org/wiki/Python_Software_Foundation_License
 __license__   = "Python Software Foundation License"
