@@ -69,7 +69,7 @@ except ImportError:
     _supports_compress = False
     # quickly define a decompress just in case we recv compressed data.
     def decompress(val):
-        raise _Error("received compressed data but I don't support compession (import error)")
+        raise _Error("received compressed data but I don't support compression (import error)")
 
 try:
     from cStringIO import StringIO
@@ -77,10 +77,12 @@ except ImportError:
     from StringIO import StringIO
 
 
-__author__    = "Evan Martin <martine@danga.com>"
-__version__ = "1.45"
+#  Original author: Evan Martin of Danga Interactive
+__author__    = "Sean Reifschneider <jafo-memcached@tummy.com>"
+__version__ = "1.46"
 __copyright__ = "Copyright (C) 2003 Danga Interactive"
-__license__   = "Python"
+#  http://en.wikipedia.org/wiki/Python_Software_Foundation_License
+__license__   = "Python Software Foundation License"
 
 SERVER_MAX_KEY_LENGTH = 250
 #  Storing values larger than 1MB requires recompiling memcached.  If you do,
@@ -196,8 +198,11 @@ class Client(local):
         self.servers = [_Host(s, self.debug) for s in servers]
         self._init_buckets()
 
-    def get_stats(self):
+    def get_stats(self, stat_args = None):
         '''Get statistics from each of the servers.
+
+        @param stat_args: Additional arguments to pass to the memcache
+            "stats" command.
 
         @return: A list of tuples ( server_identifier, stats_dictionary ).
             The dictionary contains a number of name/value pairs specifying
@@ -211,7 +216,10 @@ class Client(local):
                 name = '%s:%s (%s)' % ( s.ip, s.port, s.weight )
             else:
                 name = 'unix:%s (%s)' % ( s.address, s.weight )
-            s.send_cmd('stats')
+            if not stat_args:
+                s.send_cmd('stats')
+            else:
+                s.send_cmd('stats ' + stat_args)
             serverData = {}
             data.append(( name, serverData ))
             readline = s.readline
@@ -351,7 +359,6 @@ class Client(local):
         for server in dead_servers:
             del server_keys[server]
 
-        notstored = [] # original keys.
         for server, keys in server_keys.iteritems():
             try:
                 for key in keys:
@@ -382,12 +389,14 @@ class Client(local):
 
         try:
             server.send_cmd(cmd)
-            server.expect("DELETED")
+            line = server.readline()
+            if line and line.strip() in ['DELETED', 'NOT_FOUND']: return 1
+            self.debuglog('Delete expected DELETED or NOT_FOUND, got: %s'
+                    % repr(line))
         except socket.error, msg:
             if isinstance(msg, tuple): msg = msg[1]
             server.mark_dead(msg)
-            return 0
-        return 1
+        return 0
 
     def incr(self, key, delta=1):
         """
@@ -437,7 +446,7 @@ class Client(local):
         try:
             server.send_cmd(cmd)
             line = server.readline()
-            if line.strip() =='NOT_FOUND': return None
+            if line == None or line.strip() =='NOT_FOUND': return None
             return int(line)
         except socket.error, msg:
             if isinstance(msg, tuple): msg = msg[1]
@@ -627,20 +636,25 @@ class Client(local):
 
         self._statlog('set_multi')
 
-
-
         server_keys, prefixed_to_orig_key = self._map_and_prefix_keys(mapping.iterkeys(), key_prefix)
 
         # send out all requests on each server before reading anything
         dead_servers = []
+        notstored = [] # original keys.
 
         for server in server_keys.iterkeys():
             bigcmd = []
             write = bigcmd.append
             try:
                 for key in server_keys[server]: # These are mangled keys
-                    store_info = self._val_to_store_info(mapping[prefixed_to_orig_key[key]], min_compress_len)
-                    write("set %s %d %d %d\r\n%s\r\n" % (key, store_info[0], time, store_info[1], store_info[2]))
+                    store_info = self._val_to_store_info(
+                            mapping[prefixed_to_orig_key[key]],
+                            min_compress_len)
+                    if store_info:
+                        write("set %s %d %d %d\r\n%s\r\n" % (key, store_info[0],
+                                time, store_info[1], store_info[2]))
+                    else:
+                        notstored.append(prefixed_to_orig_key[key])
                 server.send_cmds(''.join(bigcmd))
             except socket.error, msg:
                 if isinstance(msg, tuple): msg = msg[1]
@@ -654,7 +668,6 @@ class Client(local):
         #  short-circuit if there are no servers, just return all keys
         if not server_keys: return(mapping.keys())
 
-        notstored = [] # original keys.
         for server, keys in server_keys.iteritems():
             try:
                 for key in keys:
@@ -861,7 +874,7 @@ class Client(local):
         if not line:
             line = server.readline()
 
-        if line[:5] == 'VALUE':
+        if line and line[:5] == 'VALUE':
             resp, rkey, flags, len, cas_id = line.split()
             return (rkey, int(flags), int(len), int(cas_id))
         else:
@@ -871,7 +884,7 @@ class Client(local):
         if not line:
             line = server.readline()
 
-        if line[:5] == 'VALUE':
+        if line and line[:5] == 'VALUE':
             resp, rkey, flags, len = line.split()
             flags = int(flags)
             rlen = int(len)
@@ -960,7 +973,7 @@ class _Host(object):
         if not m:
             m = re.match(r'^(?P<proto>inet):'
                     r'(?P<host>[^:]+)(:(?P<port>[0-9]+))?$', host)
-        if not m: m = re.match(r'^(?P<host>[^:]+):(?P<port>[0-9]+)$', host)
+        if not m: m = re.match(r'^(?P<host>[^:]+)(:(?P<port>[0-9]+))?$', host)
         if not m:
             raise ValueError('Unable to parse connection string: "%s"' % host)
 
@@ -1043,7 +1056,7 @@ class _Host(object):
                 self.mark_dead('Connection closed while reading from %s'
                         % repr(self))
                 self.buffer = ''
-                return None
+                return ''
             buf += data
         self.buffer = buf[index+2:]
         return buf[:index]
@@ -1129,6 +1142,11 @@ if __name__ == "__main__":
         if test_setget("long", long(1<<30)):
             print "Testing delete ...",
             if mc.delete("long"):
+                print "OK"
+            else:
+                print "FAIL"; failures = failures + 1
+            print "Checking results of delete ..."
+            if mc.get("long") == None:
                 print "OK"
             else:
                 print "FAIL"; failures = failures + 1
