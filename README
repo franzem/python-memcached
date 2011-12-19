@@ -6,3 +6,13 @@ for more information.
 This package was originally written by Evan Martin of Danga.
 Please do not contact Evan about maintenance.
 Sean Reifschneider of tummy.com, ltd. has taken over maintenance of it.
+
+Note: this is only a branch of the original for the specific purpose of adding a flag_override
+function to the original. This functionality is only useful is python-memcached is used together
+with other memcached clients such as Java or PHP, which have their own definitions of what a flag
+may mean. For example, python-memcached will flag Long Ints as 2, which PHP will interpret as 
+compressed data. Neither of these is wrong (flags are undefined) but it means they cannot 
+interoperate.I have no objection to this functionality being added to the base 
+if it is found to be useful. 
+
+Note: I have only tested the set functions, I have not tested the other implementations of set (prepend, append, multi, etc).
