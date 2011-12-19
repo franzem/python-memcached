@@ -494,7 +494,7 @@ class Client(local):
             server.mark_dead(msg)
             return None
 
-    def add(self, key, val, time = 0, min_compress_len = 0):
+    def add(self, key, val, time = 0, min_compress_len = 0, flag_override=None):
         '''
         Add new key with value.
 
@@ -503,9 +503,9 @@ class Client(local):
         @return: Nonzero on success.
         @rtype: int
         '''
-        return self._set("add", key, val, time, min_compress_len)
+        return self._set("add", key, val, time, min_compress_len, flag_override)
 
-    def append(self, key, val, time=0, min_compress_len=0):
+    def append(self, key, val, time=0, min_compress_len=0, flag_override=None):
         '''Append the value to the end of the existing key's value.
 
         Only stores in memcache if key already exists.
@@ -514,9 +514,9 @@ class Client(local):
         @return: Nonzero on success.
         @rtype: int
         '''
-        return self._set("append", key, val, time, min_compress_len)
+        return self._set("append", key, val, time, min_compress_len, flag_override)
 
-    def prepend(self, key, val, time=0, min_compress_len=0):
+    def prepend(self, key, val, time=0, min_compress_len=0, flag_override=None):
         '''Prepend the value to the beginning of the existing key's value.
 
         Only stores in memcache if key already exists.
@@ -525,9 +525,9 @@ class Client(local):
         @return: Nonzero on success.
         @rtype: int
         '''
-        return self._set("prepend", key, val, time, min_compress_len)
+        return self._set("prepend", key, val, time, min_compress_len, flag_override)
 
-    def replace(self, key, val, time=0, min_compress_len=0):
+    def replace(self, key, val, time=0, min_compress_len=0, flag_override=None):
         '''Replace existing key with value.
 
         Like L{set}, but only stores in memcache if the key already exists.
@@ -536,9 +536,9 @@ class Client(local):
         @return: Nonzero on success.
         @rtype: int
         '''
-        return self._set("replace", key, val, time, min_compress_len)
+        return self._set("replace", key, val, time, min_compress_len, flag_override)
 
-    def set(self, key, val, time=0, min_compress_len=0):
+    def set(self, key, val, time=0, min_compress_len=0, flag_override=None):
         '''Unconditionally sets a key to a given value in the memcache.
 
         The C{key} can optionally be an tuple, with the first element
@@ -561,11 +561,17 @@ class Client(local):
         attempt at compression yeilds a larger string than the input, then it is
         discarded. For backwards compatability, this parameter defaults to 0,
         indicating don't ever try to compress.
+        @param flag_override: specify the Memcached flag that will be used to set the value. 
+        Not required for normal python-memcached operations, so defaults to None. Useful 
+        when using python-memcached with other memcached clients (Java, PHP) which may 
+        use their own flags for when storing data. For example, python-memcached flags
+        Long Integers as 2, which PHP interprets as compressed data. Simply specify the flag
+        with which you want the data stored in memcached.
         '''
-        return self._set("set", key, val, time, min_compress_len)
+        return self._set("set", key, val, time, min_compress_len, flag_override)
 
 
-    def cas(self, key, val, time=0, min_compress_len=0):
+    def cas(self, key, val, time=0, min_compress_len=0, flag_override=None):
         '''Sets a key to a given value in the memcache if it hasn't been
         altered since last fetched. (See L{gets}).
 
@@ -591,8 +597,14 @@ class Client(local):
         yeilds a larger string than the input, then it is discarded. For
         backwards compatability, this parameter defaults to 0, indicating
         don't ever try to compress.
-        '''
-        return self._set("cas", key, val, time, min_compress_len)
+        @param flag_override: specify the Memcached flag that will be used to set the value. 
+        Not required for normal python-memcached operations, so defaults to None. Useful 
+        when using python-memcached with other memcached clients (Java, PHP) which may 
+        use their own flags for when storing data. For example, python-memcached flags
+        Long Integers as 2, which PHP interprets as compressed data. Simply specify the flag
+        with which you want the data stored in memcached.
+       '''
+        return self._set("cas", key, val, time, min_compress_len, flag_override)
 
 
     def _map_and_prefix_keys(self, key_iterable, key_prefix):
@@ -634,7 +646,7 @@ class Client(local):
 
         return (server_keys, prefixed_to_orig_key)
 
-    def set_multi(self, mapping, time=0, key_prefix='', min_compress_len=0):
+    def set_multi(self, mapping, time=0, key_prefix='', min_compress_len=0, flag_override=None):
         '''
         Sets multiple keys in the memcache doing just one query.
 
@@ -670,6 +682,13 @@ class Client(local):
         attempt at compression yeilds a larger string than the input, then it is
         discarded. For backwards compatability, this parameter defaults to 0,
         indicating don't ever try to compress.
+        @param flag_override: specify the Memcached flag that will be used to set the value. 
+        Not required for normal python-memcached operations, so defaults to None. Useful 
+        when using python-memcached with other memcached clients (Java, PHP) which may 
+        use their own flags for when storing data. For example, python-memcached flags
+        Long Integers as 2, which PHP interprets as compressed data. Simply specify the flag
+        with which you want the data stored in memcached.
+
         @return: List of keys which failed to be stored [ memcache out of memory, etc. ].
         @rtype: list
 
@@ -690,7 +709,8 @@ class Client(local):
                 for key in server_keys[server]: # These are mangled keys
                     store_info = self._val_to_store_info(
                             mapping[prefixed_to_orig_key[key]],
-                            min_compress_len)
+                            min_compress_len,
+                            flag_override)
                     if store_info:
                         write("set %s %d %d %d\r\n%s\r\n" % (key, store_info[0],
                                 time, store_info[1], store_info[2]))
@@ -722,7 +742,7 @@ class Client(local):
                 server.mark_dead(msg)
         return notstored
 
-    def _val_to_store_info(self, val, min_compress_len):
+    def _val_to_store_info(self, val, min_compress_len, flag_override):
         """
            Transform val to a storable representation, returning a tuple of the flags, the length of the new value, and the new value itself.
         """
@@ -766,9 +786,12 @@ class Client(local):
         if self.server_max_value_length != 0 and \
            len(val) > self.server_max_value_length: return(0)
 
+        if flag_override is not None:
+            flags = flag_override
+
         return (flags, len(val), val)
 
-    def _set(self, cmd, key, val, time, min_compress_len = 0):
+    def _set(self, cmd, key, val, time, min_compress_len = 0, flag_override = None):
         self.check_key(key)
         server, key = self._get_server(key)
         if not server:
@@ -777,7 +800,7 @@ class Client(local):
         def _unsafe_set():
             self._statlog(cmd)
 
-            store_info = self._val_to_store_info(val, min_compress_len)
+            store_info = self._val_to_store_info(val, min_compress_len, flag_override)
             if not store_info: return(0)
 
             if cmd == 'cas':
