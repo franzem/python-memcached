@@ -6,3 +6,9 @@ for more information.
 This package was originally written by Evan Martin of Danga.
 Please do not contact Evan about maintenance.
 Sean Reifschneider of tummy.com, ltd. has taken over maintenance of it.
+
+Note: this is only a branch of the original for the specific purpose of adding a flag_override
+function to the original. I have no objection to this funtionality being added to the base 
+if it is found to be useful. 
+
+Note: I have only tested the set functions, I have not tested the other implementations of set (prepend, append, multi, etc).
